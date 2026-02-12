@@ -1,0 +1,18 @@
+# Installer files (examples only - not part of template)
+*.exe
+*.msi
+*.msp
+*.msu
+
+# Configuration files (examples only)
+*.json
+
+# IntuneWin packages
+*.intunewin
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# VS Code
+.vscode/
