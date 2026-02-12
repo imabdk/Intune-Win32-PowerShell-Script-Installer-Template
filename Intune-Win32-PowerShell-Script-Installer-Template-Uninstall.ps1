@@ -1,30 +1,73 @@
+#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Intune Win32 app PowerShell script uninstaller template.
+    Intune Win32 app PowerShell script installer template - Uninstall.
+
 .DESCRIPTION
     Template for uninstalling applications via the Intune Win32 PowerShell script installer feature.
+    
+    Features:
+    - Supports both MSI and EXE uninstallers
+    - Removes configuration files from user profiles (supports SYSTEM context)
+    - Works with both AD and Entra ID joined devices
+    - Comprehensive logging for troubleshooting
+    
+    Note: This script is designed to run in SYSTEM context via Intune.
+    
 .NOTES
-    Author:   Martin Bengtsson
-    Date:     2026-02-12
-    Version:  1.0
+    Author:      Martin Bengtsson
+    Twitter:     @mwbengtsson
+    LinkedIn:    linkedin.com/in/martin-bengtsson
+    Website:     https://www.imab.dk
+    Created:     2026-02-12
+    Updated:     2026-02-12
+    Version:     1.1
+    
+    Changelog:
+    1.1 - Added registry removal support with SYSTEM context awareness
+    1.0 - Initial release
+
+.LINK
+    https://github.com/imabdk/Intune-Win32-PowerShell-Script-Installer-Template
+
+.LINK
+    https://learn.microsoft.com/intune/intune-service/apps/apps-win32-app-management
 #>
 
 # === Configuration ===
-[string]$AppName         = "Notepad++"
-[string]$LogFile         = "$env:ProgramData\Microsoft\IntuneManagementExtension\Logs\$AppName-Uninstall.log"
 
-# Uninstaller configuration
+# --- App Identity ---
+[string]$AppName = "Notepad++"
+[string]$LogFile = "$env:ProgramData\Microsoft\IntuneManagementExtension\Logs\$AppName-Uninstall.log"
+
+# --- Step 1: Uninstaller ---
 [string]$UninstallerFile = "npp.8.9.1.Installer.x64.msi"
 [string]$UninstallerArgs = "/qn /norestart"
+[int[]]$SuccessExitCodes = @(0, 3010)
 # Examples:
 #   MSI: "/qn /norestart"
 #   EXE: "/S" or "/silent" or "/VERYSILENT /SUPPRESSMSGBOXES"
-[int[]]$SuccessExitCodes = @(0, 3010)
 
-# Files to delete during uninstallation
+# --- Step 2: Delete Files ---
+# SYSTEM context: $env:APPDATA/$env:LOCALAPPDATA paths are applied to all user profiles
 $FilesToDelete = @(
     "$env:APPDATA\Notepad++\imabdk-config.json"
     # "$env:LOCALAPPDATA\MyApp\settings.xml"
+)
+
+# --- Step 3: Remove Registry Settings ---
+# Action: "DeleteValue" removes a single value, "DeleteKey" removes entire key and subkeys
+# SYSTEM context: HKCU paths are automatically applied to all user profiles
+$RegistryRemovals = @(
+    @{
+        Path   = "HKLM:\SOFTWARE\imab.dk"
+        Action = "DeleteKey"
+    }
+    # @{
+    #     Path   = "HKLM:\SOFTWARE\MyApp"
+    #     Name   = "SettingName"
+    #     Action = "DeleteValue"
+    # }
 )
 
 #region Functions
@@ -134,6 +177,56 @@ function Remove-FilesFromDestination {
         }
     }
 }
+
+function Remove-RegistrySettings {
+    <#
+    .SYNOPSIS
+        Removes registry values or keys. HKCU paths are applied to all user profiles when running as SYSTEM.
+    #>
+    param (
+        [Parameter(Mandatory)]
+        [array]$Settings
+    )
+
+    $isSystem = ([System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value -eq "S-1-5-18")
+
+    foreach ($setting in $Settings) {
+        $paths = @()
+
+        if ($setting.Path -like "HKCU:\*" -and $isSystem) {
+            # Get all real user profiles and build paths for each
+            $userProfiles = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*" |
+                Where-Object { $_.PSChildName -match "^S-1-(5-21|12-1)-" -and (Test-Path $_.ProfileImagePath) }
+
+            Write-Log "Running as SYSTEM - removing from $($userProfiles.Count) user profile(s)"
+
+            foreach ($profile in $userProfiles) {
+                $sid = $profile.PSChildName
+                $paths += $setting.Path -replace "^HKCU:\\", "Registry::HKEY_USERS\$sid\"
+            }
+        }
+        else {
+            $paths += $setting.Path
+        }
+
+        foreach ($regPath in $paths) {
+            switch ($setting.Action) {
+                "DeleteValue" {
+                    if (Test-Path $regPath) {
+                        Remove-ItemProperty -Path $regPath -Name $setting.Name -Force -ErrorAction SilentlyContinue
+                        Write-Log "Removed value: $regPath\$($setting.Name)"
+                    }
+                }
+                "DeleteKey" {
+                    if (Test-Path $regPath) {
+                        Remove-Item -Path $regPath -Recurse -Force -ErrorAction SilentlyContinue
+                        Write-Log "Removed key: $regPath"
+                    }
+                }
+            }
+        }
+    }
+}
 #endregion
 
 #region Main
@@ -142,10 +235,22 @@ Write-Log "Running as: $([System.Security.Principal.WindowsIdentity]::GetCurrent
 Write-Log "Script path: $PSScriptRoot"
 
 try {
+    # --- Step 1: Uninstall application ---
+    Write-Log "--- Step 1: Uninstalling application ---"
     $uninstallerPath = Join-Path -Path $PSScriptRoot -ChildPath $UninstallerFile
-
     Uninstall-Application -UninstallerPath $uninstallerPath -Arguments $UninstallerArgs -SuccessCodes $SuccessExitCodes
-    Remove-FilesFromDestination -Files $FilesToDelete
+
+    # --- Step 2: Delete configuration files ---
+    if ($FilesToDelete.Count -gt 0) {
+        Write-Log "--- Step 2: Deleting configuration files ---"
+        Remove-FilesFromDestination -Files $FilesToDelete
+    }
+
+    # --- Step 3: Remove registry settings ---
+    if ($RegistryRemovals.Count -gt 0) {
+        Write-Log "--- Step 3: Removing registry settings ---"
+        Remove-RegistrySettings -Settings $RegistryRemovals
+    }
 
     Write-Log "=== Uninstallation of $AppName completed successfully ==="
     exit 0  # Success
