@@ -1,6 +1,6 @@
 # Intune Win32 PowerShell Script Installer Template
 
-PowerShell templates for deploying Win32 applications through Microsoft Intune. Handles MSI/EXE installers, file copy operations, and registry settings.
+Templates for the [PowerShell script installer](https://learn.microsoft.com/en-us/intune/intune-service/apps/apps-win32-app-management#powershell-script-installer) feature in Microsoft Intune Win32 app management. Instead of specifying a command line, you can upload a PowerShell script as the installer. These templates provide a structured approach for MSI/EXE installation, file operations, and registry settings with logging and error handling.
 
 ## Files
 
@@ -8,7 +8,14 @@ PowerShell templates for deploying Win32 applications through Microsoft Intune. 
 |------|---------|
 | `Intune-Win32-PowerShell-Script-Installer-Template-Install.ps1` | Installation script |
 | `Intune-Win32-PowerShell-Script-Installer-Template-Uninstall.ps1` | Uninstallation script |
-| `Test-TemplateScripts.ps1` | Test suite for validation |
+
+## Script Requirements
+
+Per Microsoft documentation:
+- Scripts are limited to **50 KB** in size
+- Scripts run in the same context as the app installer (SYSTEM or user)
+- Return codes determine installation success or failure
+- Scripts must run silently without user interaction
 
 ## Quick Start
 
@@ -84,21 +91,6 @@ Logs are written to:
 ```
 
 Each entry includes timestamp and log level (INFO, WARNING, ERROR).
-
-## Testing
-
-Run the test script to validate functionality:
-
-```powershell
-.\Test-TemplateScripts.ps1
-```
-
-Tests include:
-- Syntax validation
-- SYSTEM/User context detection
-- Registry operations (HKLM and HKCU)
-- File copy operations
-- Permission handling
 
 ## Intune Detection Rules
 

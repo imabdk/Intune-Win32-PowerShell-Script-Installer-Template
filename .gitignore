@@ -4,6 +4,9 @@
 *.msp
 *.msu
 
+# Test files
+Test-TemplateScripts.ps1
+
 # Configuration files (examples only)
 *.json
 
