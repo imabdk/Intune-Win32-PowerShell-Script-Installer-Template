@@ -126,6 +126,11 @@ function Copy-FilesToDestination {
         [array]$Files
     )
 
+    if ($script:IsSystem) {
+        $userProfilePaths = Get-UserProfiles | Select-Object -ExpandProperty ProfileImagePath
+        Write-Log "Running as SYSTEM - copying to $($userProfilePaths.Count) user profile(s)"
+    }
+
     foreach ($file in $Files) {
         $sourcePath = Join-Path -Path $BasePath -ChildPath $file.Source
         if (-not (Test-Path -Path $sourcePath)) {
@@ -133,10 +138,7 @@ function Copy-FilesToDestination {
         }
 
         if ($script:IsSystem) {
-            $userProfiles = Get-UserProfiles | Select-Object -ExpandProperty ProfileImagePath
-            Write-Log "Running as SYSTEM - copying to $($userProfiles.Count) user profile(s)"
-
-            foreach ($profilePath in $userProfiles) {
+            foreach ($profilePath in $userProfilePaths) {
                 # Translate user-specific environment paths to actual profile paths
                 $destPath = $file.Destination `
                     -replace '\$env:APPDATA', "$profilePath\AppData\Roaming" `
@@ -155,8 +157,6 @@ function Copy-FilesToDestination {
             }
         }
         else {
-            # Running as user - copy to current user only
-            # Check admin requirement for destination
             if ((Test-RequiresAdmin -Path $file.Destination) -and -not $script:IsAdmin) {
                 throw "Access denied: '$($file.Destination)' requires administrator privileges"
             }
@@ -177,11 +177,13 @@ function Set-RegistryAdditions {
         [array]$Settings
     )
 
+    $userProfiles = if ($script:IsSystem) { Get-UserProfiles } else { $null }
+    if ($userProfiles) {
+        Write-Log "Running as SYSTEM - applying HKCU settings to $($userProfiles.Count) user profile(s)"
+    }
+
     foreach ($setting in $Settings) {
         if ($setting.Path -like "HKCU:\*" -and $script:IsSystem) {
-            $userProfiles = Get-UserProfiles
-            Write-Log "Running as SYSTEM - applying HKCU setting to $($userProfiles.Count) user profile(s)"
-
             foreach ($userProfile in $userProfiles) {
                 $sid = $userProfile.PSChildName
                 $hivePath = "Registry::HKEY_USERS\$sid"
@@ -195,8 +197,6 @@ function Set-RegistryAdditions {
             }
         }
         else {
-            # HKLM or running as user
-            # Check admin requirement for HKLM
             if ((Test-RequiresAdmin -Path $setting.Path) -and -not $script:IsAdmin) {
                 throw "Access denied: '$($setting.Path)' requires administrator privileges"
             }
@@ -236,10 +236,10 @@ try {
     }
 
     Write-Log "=== Installation of $AppName completed successfully ==="
-    exit 0  # Success
+    exit 0
 }
 catch {
     Write-Log "=== Installation of $AppName failed: $($_.Exception.Message) ==="
-    exit 1  # Failure
+    exit 1
 }
 #endregion

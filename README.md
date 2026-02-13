@@ -89,8 +89,6 @@ Logs are written to:
 %ProgramData%\Microsoft\IntuneManagementExtension\Logs\<AppName>-Uninstall.log
 ```
 
-Each entry includes timestamp and log level (INFO, WARNING, ERROR).
-
 ## Notes
 
 - Scripts work without admin rights but some operations require elevation

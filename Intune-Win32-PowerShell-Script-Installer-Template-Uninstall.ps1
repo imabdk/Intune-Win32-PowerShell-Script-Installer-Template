@@ -124,12 +124,14 @@ function Remove-FilesFromDestination {
         [array]$Files
     )
 
+    if ($script:IsSystem) {
+        $userProfilePaths = Get-UserProfiles | Select-Object -ExpandProperty ProfileImagePath
+        Write-Log "Running as SYSTEM - deleting from $($userProfilePaths.Count) user profile(s)"
+    }
+
     foreach ($file in $Files) {
         if ($script:IsSystem) {
-            $userProfiles = Get-UserProfiles | Select-Object -ExpandProperty ProfileImagePath
-            Write-Log "Running as SYSTEM - deleting from $($userProfiles.Count) user profile(s)"
-
-            foreach ($profilePath in $userProfiles) {
+            foreach ($profilePath in $userProfilePaths) {
                 # Translate user-specific environment paths to actual profile paths
                 $filePath = $file `
                     -replace '\$env:APPDATA', "$profilePath\AppData\Roaming" `
@@ -147,8 +149,6 @@ function Remove-FilesFromDestination {
             }
         }
         else {
-            # Running as user - delete from current user only
-            # Check admin requirement for path
             if ((Test-RequiresAdmin -Path $file) -and -not $script:IsAdmin) {
                 throw "Access denied: '$file' requires administrator privileges"
             }
@@ -168,13 +168,15 @@ function Remove-RegistrySettings {
         [array]$Settings
     )
 
+    $userProfiles = if ($script:IsSystem) { Get-UserProfiles } else { $null }
+    if ($userProfiles) {
+        Write-Log "Running as SYSTEM - removing from $($userProfiles.Count) user profile(s)"
+    }
+
     foreach ($setting in $Settings) {
         $paths = @()
 
         if ($setting.Path -like "HKCU:\*" -and $script:IsSystem) {
-            $userProfiles = Get-UserProfiles
-            Write-Log "Running as SYSTEM - removing from $($userProfiles.Count) user profile(s)"
-
             foreach ($userProfile in $userProfiles) {
                 $sid = $userProfile.PSChildName
                 $paths += $setting.Path -replace "^HKCU:\\", "Registry::HKEY_USERS\$sid\"
@@ -233,10 +235,10 @@ try {
     }
 
     Write-Log "=== Uninstallation of $AppName completed successfully ==="
-    exit 0  # Success
+    exit 0
 }
 catch {
     Write-Log "=== Uninstallation of $AppName failed: $($_.Exception.Message) ==="
-    exit 1  # Failure
+    exit 1
 }
 #endregion
