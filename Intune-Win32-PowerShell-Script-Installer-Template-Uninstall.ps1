@@ -22,8 +22,8 @@
 [string]$UninstallerArgs = "/qn /norestart"
 [int[]]$SuccessExitCodes = @(0, 3010)
 # Examples:
-#   MSI: "/qn /norestart"
-#   EXE: "/S" or "/silent" or "/VERYSILENT /SUPPRESSMSGBOXES"
+#   MSI: $UninstallerFile = "setup.msi", $UninstallerArgs = "/qn /norestart"
+#   EXE: $UninstallerFile = "$env:ProgramFiles\Notepad++\uninstall.exe", $UninstallerArgs = "/S"
 
 # --- Step 2: Delete Files ---
 # SYSTEM context: $env:APPDATA/$env:LOCALAPPDATA paths are applied to all user profiles
@@ -183,7 +183,6 @@ function Remove-RegistrySettings {
             }
         }
         else {
-            # Check admin requirement for HKLM
             if ((Test-RequiresAdmin -Path $setting.Path) -and -not $script:IsAdmin) {
                 throw "Access denied: '$($setting.Path)' requires administrator privileges"
             }
@@ -219,7 +218,8 @@ Write-Log "Script path: $PSScriptRoot"
 try {
     # --- Step 1: Uninstall application ---
     Write-Log "--- Step 1: Uninstalling application ---"
-    $uninstallerPath = Join-Path -Path $PSScriptRoot -ChildPath $UninstallerFile
+    # Use absolute path if provided, otherwise join with script root
+    $uninstallerPath = if ([System.IO.Path]::IsPathRooted($UninstallerFile)) { $UninstallerFile } else { Join-Path -Path $PSScriptRoot -ChildPath $UninstallerFile }
     Uninstall-Application -UninstallerPath $uninstallerPath -Arguments $UninstallerArgs -SuccessCodes $SuccessExitCodes
 
     # --- Step 2: Delete configuration files ---

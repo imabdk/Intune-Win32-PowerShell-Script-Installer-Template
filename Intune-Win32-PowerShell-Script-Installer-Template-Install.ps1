@@ -220,7 +220,7 @@ Write-Log "Script path: $PSScriptRoot"
 try {
     # --- Step 1: Install application ---
     Write-Log "--- Step 1: Installing application ---"
-    $installerPath = Join-Path -Path $PSScriptRoot -ChildPath $InstallerFile
+    $installerPath = if ([System.IO.Path]::IsPathRooted($InstallerFile)) { $InstallerFile } else { Join-Path -Path $PSScriptRoot -ChildPath $InstallerFile }
     Install-Application -InstallerPath $installerPath -Arguments $InstallerArgs -SuccessCodes $SuccessExitCodes
 
     # --- Step 2: Copy configuration files ---
