@@ -1,6 +1,6 @@
 # Intune Win32 PowerShell Script Installer Template
 
-Templates for the [PowerShell script installer](https://learn.microsoft.com/en-us/intune/intune-service/apps/apps-win32-app-management#powershell-script-installer) feature in Microsoft Intune Win32 app management. Instead of specifying a command line, you can upload a PowerShell script as the installer. These templates provide a structured approach for MSI/EXE installation, file operations, and registry settings with logging and error handling.
+Templates for the [PowerShell script installer](https://learn.microsoft.com/en-us/intune/intune-service/apps/apps-win32-app-management#powershell-script-installer) feature in Microsoft Intune Win32 app management. Instead of specifying a command line, you can upload a PowerShell script as the installer. Supports MSI/EXE installation, file copy, and registry settings.
 
 ## Files
 
@@ -59,7 +59,7 @@ $RegistryAdditions = @(
 
 ## Execution Context
 
-The scripts detect whether they run as **SYSTEM** or as the **current user** and adapt behavior accordingly.
+The scripts detect whether they run as **SYSTEM** or as the **current user** and behave differently.
 
 ### SYSTEM Context (typical for Intune deployments)
 
@@ -80,7 +80,6 @@ Scripts check for required permissions before attempting operations:
 
 - HKLM registry paths require admin privileges
 - Protected filesystem paths (Program Files, Windows, etc.) require elevation
-- Clear error messages when permissions are insufficient
 
 ## Logging
 
@@ -91,18 +90,6 @@ Logs are written to:
 ```
 
 Each entry includes timestamp and log level (INFO, WARNING, ERROR).
-
-## Intune Detection Rules
-
-Example detection rule for registry-based detection:
-
-| Setting | Value |
-|---------|-------|
-| Rule type | Registry |
-| Key path | `HKEY_LOCAL_MACHINE\SOFTWARE\imab.dk` |
-| Value name | `AppVersion` |
-| Detection method | String comparison |
-| Value | `1.0` |
 
 ## Notes
 
