@@ -29,9 +29,8 @@ Per Microsoft documentation:
 Edit the variables at the top of each script:
 
 ```powershell
-$AppName    = "YourAppName"
-$AppVersion = "1.0.0"
-$LogFile    = "$env:ProgramData\Microsoft\IntuneManagementExtension\Logs\$AppName.log"
+$AppName = "YourAppName"
+$LogFile = "$env:ProgramData\Microsoft\IntuneManagementExtension\Logs\$AppName-Install.log"
 ```
 
 ### Installer Settings (Install script only)
@@ -52,9 +51,9 @@ $FilesToCopy = @(
 ### Registry Settings
 
 ```powershell
-$RegistrySettings = @(
-    @{ Path = "HKLM:\SOFTWARE\YourApp"; Name = "Version"; Value = "1.0.0"; Type = "String" }
-    @{ Path = "HKCU:\SOFTWARE\YourApp"; Name = "Configured"; Value = 1; Type = "DWord" }
+$RegistryAdditions = @(
+    @{ Path = "HKLM:\SOFTWARE\YourApp"; Name = "AppVersion"; Value = "1.0"; Type = "String" }
+    @{ Path = "HKCU:\SOFTWARE\YourApp"; Name = "UserSetting"; Value = 1; Type = "DWord" }
 )
 ```
 
@@ -100,9 +99,9 @@ Example detection rule for registry-based detection:
 |---------|-------|
 | Rule type | Registry |
 | Key path | `HKEY_LOCAL_MACHINE\SOFTWARE\YourApp` |
-| Value name | `Version` |
+| Value name | `AppVersion` |
 | Detection method | String comparison |
-| Value | `1.0.0` |
+| Value | `1.0` |
 
 ## Notes
 
