@@ -59,13 +59,19 @@ $FilesToDelete = @(
 # Action: "DeleteValue" removes a single value, "DeleteKey" removes entire key and subkeys
 # SYSTEM context: HKCU paths are automatically applied to all user profiles
 $RegistryRemovals = @(
+    # Delete entire keys (removes all values within)
     @{
         Path   = "HKLM:\SOFTWARE\imab.dk"
         Action = "DeleteKey"
     }
+    @{
+        Path   = "HKCU:\SOFTWARE\imab.dk"
+        Action = "DeleteKey"
+    }
+    # Example: Delete individual values instead of the whole key
     # @{
-    #     Path   = "HKLM:\SOFTWARE\MyApp"
-    #     Name   = "SettingName"
+    #     Path   = "HKCU:\SOFTWARE\imab.dk"
+    #     Name   = "AwesomeLevel"
     #     Action = "DeleteValue"
     # }
 )

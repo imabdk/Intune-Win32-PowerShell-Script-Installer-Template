@@ -60,6 +60,13 @@ $FilesToCopy = @(
 # Types: String, DWord, QWord, Binary, MultiString, ExpandString
 # SYSTEM context: HKCU paths are automatically applied to all user profiles
 $RegistryAdditions = @(
+    # Machine-wide settings (HKLM)
+    @{
+        Path  = "HKLM:\SOFTWARE\imab.dk"
+        Name  = "BlogURL"
+        Value = "https://www.imab.dk"
+        Type  = "String"
+    }
     @{
         Path  = "HKLM:\SOFTWARE\imab.dk"
         Name  = "Author"
@@ -67,9 +74,28 @@ $RegistryAdditions = @(
         Type  = "String"
     }
     @{
+        Path  = "HKLM:\SOFTWARE\imab.dk"
+        Name  = "AwesomeLevel"
+        Value = 100
+        Type  = "DWord"
+    }
+    # Per-user settings (HKCU - applied to all user profiles when running as SYSTEM)
+    @{
+        Path  = "HKCU:\SOFTWARE\imab.dk"
+        Name  = "BlogURL"
+        Value = "https://www.imab.dk"
+        Type  = "String"
+    }
+    @{
+        Path  = "HKCU:\SOFTWARE\imab.dk"
+        Name  = "Author"
+        Value = "Martin Bengtsson"
+        Type  = "String"
+    }
+    @{
         Path  = "HKCU:\SOFTWARE\imab.dk"
         Name  = "AwesomeLevel"
-        Value = 900
+        Value = 100
         Type  = "DWord"
     }
 )
