@@ -92,5 +92,4 @@ Logs are written to:
 ## Notes
 
 - Scripts work without admin rights but some operations require elevation
-- HKCU settings deployed via SYSTEM context persist across user sessions
 - Test in a non-production environment before deployment
