@@ -1,37 +1,14 @@
-#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Intune Win32 app PowerShell script installer template - Install.
-
 .DESCRIPTION
-    Template for deploying applications via the Intune Win32 PowerShell script installer feature.
-    
-    Features:
-    - Supports both MSI and EXE installers
-    - Copies configuration files to user profiles (supports SYSTEM context)
-    - Works with both AD and Entra ID joined devices
-    - Comprehensive logging for troubleshooting
-    
-    Note: This script is designed to run in SYSTEM context via Intune.
-    
+    Deploys applications via Intune Win32 PowerShell script installer.
+    Supports MSI/EXE, file copy, and registry settings.
+    SYSTEM context: applies HKCU/user files to ALL profiles.
+    User context: applies to current user only.
 .NOTES
-    Author:      Martin Bengtsson
-    Twitter:     @mwbengtsson
-    LinkedIn:    linkedin.com/in/martin-bengtsson
-    Website:     https://www.imab.dk
-    Created:     2026-02-11
-    Updated:     2026-02-12
-    Version:     1.1
-    
-    Changelog:
-    1.1 - Added registry settings support with SYSTEM context awareness
-    1.0 - Initial release
-
-.LINK
-    https://github.com/imabdk/Intune-Win32-PowerShell-Script-Installer-Template
-
-.LINK
-    https://learn.microsoft.com/intune/intune-service/apps/apps-win32-app-management
+    Author:  Martin Bengtsson | imab.dk
+    Version: 1.2
 #>
 
 # === Configuration ===
@@ -58,55 +35,36 @@ $FilesToCopy = @(
 
 # --- Step 3: Registry Additions ---
 # Types: String, DWord, QWord, Binary, MultiString, ExpandString
-# SYSTEM context: HKCU paths are automatically applied to all user profiles
+# SYSTEM context: HKCU paths are applied to all user profiles
 $RegistryAdditions = @(
-    # Machine-wide settings (HKLM)
-    @{
-        Path  = "HKLM:\SOFTWARE\imab.dk"
-        Name  = "BlogURL"
-        Value = "https://www.imab.dk"
-        Type  = "String"
-    }
-    @{
-        Path  = "HKLM:\SOFTWARE\imab.dk"
-        Name  = "Author"
-        Value = "Martin Bengtsson"
-        Type  = "String"
-    }
-    @{
-        Path  = "HKLM:\SOFTWARE\imab.dk"
-        Name  = "AwesomeLevel"
-        Value = 100
-        Type  = "DWord"
-    }
-    # Per-user settings (HKCU - applied to all user profiles when running as SYSTEM)
-    @{
-        Path  = "HKCU:\SOFTWARE\imab.dk"
-        Name  = "BlogURL"
-        Value = "https://www.imab.dk"
-        Type  = "String"
-    }
-    @{
-        Path  = "HKCU:\SOFTWARE\imab.dk"
-        Name  = "Author"
-        Value = "Martin Bengtsson"
-        Type  = "String"
-    }
-    @{
-        Path  = "HKCU:\SOFTWARE\imab.dk"
-        Name  = "AwesomeLevel"
-        Value = 100
-        Type  = "DWord"
-    }
+    @{ Path = "HKLM:\SOFTWARE\imab.dk"; Name = "AppVersion"; Value = "1.0"; Type = "String" }
+    @{ Path = "HKCU:\SOFTWARE\imab.dk"; Name = "UserSetting"; Value = 1; Type = "DWord" }
 )
 
+# === Runtime Detection ===
+$script:IsSystem = ([System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value -eq "S-1-5-18")
+$script:IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
 #region Functions
-function Write-Log {
-    <#
-    .SYNOPSIS
-        Writes to both console (for Intune portal) and local log file.
-    #>
-    param(
+# Tests if path requires administrator privileges
+function Test-RequiresAdmin {
+    param([string]$Path)
+    if ($Path -match "^HKLM:|^Registry::HKEY_LOCAL_MACHINE") { return $true }
+    $adminPaths = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:SystemRoot, $env:ProgramData)
+    foreach ($adminPath in $adminPaths) {
+        if ($adminPath -and $Path -like "$adminPath*") { return $true }
+    }
+    return $false
+}
+
+# Gets all user profiles (AD and Entra ID)
+function Get-UserProfiles {
+    Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*" |
+        Where-Object { $_.PSChildName -match "^S-1-(5-21|12-1)-" -and (Test-Path $_.ProfileImagePath) }
+}
+
+# Writes to console and log file
+function Write-Log {    param(
         [string]$Message,
         [int]$MaxLogSizeMB = 5
     )
@@ -123,11 +81,8 @@ function Write-Log {
     catch { }
 }
 
+# Installs application using MSI or EXE
 function Install-Application {
-    <#
-    .SYNOPSIS
-        Installs the application using MSI or EXE installer.
-    #>
     param (
         [Parameter(Mandatory)]
         [string]$InstallerPath,
@@ -163,20 +118,13 @@ function Install-Application {
     }
 }
 
+# Copies files (SYSTEM: to all profiles, User: current only)
 function Copy-FilesToDestination {
-    <#
-    .SYNOPSIS
-        Copies files from the package to their destinations.
-        When running as SYSTEM, copies to all existing user profiles.
-    #>
     param (
         [Parameter(Mandatory)]
         [string]$BasePath,
         [array]$Files
     )
-
-    # Detect if running as SYSTEM (S-1-5-18)
-    $isSystem = ([System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value -eq "S-1-5-18")
 
     foreach ($file in $Files) {
         $sourcePath = Join-Path -Path $BasePath -ChildPath $file.Source
@@ -184,13 +132,8 @@ function Copy-FilesToDestination {
             throw "File not found in package: $sourcePath"
         }
 
-        if ($isSystem) {
-            # Get all real user profiles from registry (excludes system accounts)
-            # Supports both traditional AD (S-1-5-21-*) and Entra ID (S-1-12-1-*) joined devices
-            $userProfiles = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*" |
-                Where-Object { $_.PSChildName -match "^S-1-(5-21|12-1)-" -and (Test-Path $_.ProfileImagePath) } |
-                Select-Object -ExpandProperty ProfileImagePath
-
+        if ($script:IsSystem) {
+            $userProfiles = Get-UserProfiles | Select-Object -ExpandProperty ProfileImagePath
             Write-Log "Running as SYSTEM - copying to $($userProfiles.Count) user profile(s)"
 
             foreach ($profilePath in $userProfiles) {
@@ -198,6 +141,11 @@ function Copy-FilesToDestination {
                 $destPath = $file.Destination `
                     -replace '\$env:APPDATA', "$profilePath\AppData\Roaming" `
                     -replace '\$env:LOCALAPPDATA', "$profilePath\AppData\Local"
+
+                # Check admin requirement for destination
+                if ((Test-RequiresAdmin -Path $destPath) -and -not $script:IsAdmin) {
+                    throw "Access denied: '$destPath' requires administrator privileges"
+                }
 
                 if (-not (Test-Path -Path $destPath)) {
                     New-Item -Path $destPath -ItemType Directory -Force | Out-Null
@@ -208,6 +156,11 @@ function Copy-FilesToDestination {
         }
         else {
             # Running as user - copy to current user only
+            # Check admin requirement for destination
+            if ((Test-RequiresAdmin -Path $file.Destination) -and -not $script:IsAdmin) {
+                throw "Access denied: '$($file.Destination)' requires administrator privileges"
+            }
+
             if (-not (Test-Path -Path $file.Destination)) {
                 New-Item -Path $file.Destination -ItemType Directory -Force | Out-Null
             }
@@ -217,28 +170,20 @@ function Copy-FilesToDestination {
     }
 }
 
+# Applies registry settings (SYSTEM: to all profiles, User: current only)
 function Set-RegistryAdditions {
-    <#
-    .SYNOPSIS
-        Applies registry settings. HKCU paths are applied to all user profiles when running as SYSTEM.
-    #>
     param (
         [Parameter(Mandatory)]
         [array]$Settings
     )
 
-    $isSystem = ([System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value -eq "S-1-5-18")
-
     foreach ($setting in $Settings) {
-        if ($setting.Path -like "HKCU:\*" -and $isSystem) {
-            # Get all real user profiles and apply to each user's registry hive
-            $userProfiles = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*" |
-                Where-Object { $_.PSChildName -match "^S-1-(5-21|12-1)-" -and (Test-Path $_.ProfileImagePath) }
-
+        if ($setting.Path -like "HKCU:\*" -and $script:IsSystem) {
+            $userProfiles = Get-UserProfiles
             Write-Log "Running as SYSTEM - applying HKCU setting to $($userProfiles.Count) user profile(s)"
 
-            foreach ($profile in $userProfiles) {
-                $sid = $profile.PSChildName
+            foreach ($userProfile in $userProfiles) {
+                $sid = $userProfile.PSChildName
                 $hivePath = "Registry::HKEY_USERS\$sid"
                 $regPath = $setting.Path -replace "^HKCU:\\", "$hivePath\"
 
@@ -251,6 +196,11 @@ function Set-RegistryAdditions {
         }
         else {
             # HKLM or running as user
+            # Check admin requirement for HKLM
+            if ((Test-RequiresAdmin -Path $setting.Path) -and -not $script:IsAdmin) {
+                throw "Access denied: '$($setting.Path)' requires administrator privileges"
+            }
+
             if (-not (Test-Path $setting.Path)) {
                 New-Item -Path $setting.Path -Force | Out-Null
             }
@@ -264,6 +214,7 @@ function Set-RegistryAdditions {
 #region Main
 Write-Log "=== Starting installation of $AppName ==="
 Write-Log "Running as: $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)"
+Write-Log "Context: $(if ($script:IsSystem) { 'SYSTEM' } else { 'User' }), Admin: $($script:IsAdmin)"
 Write-Log "Script path: $PSScriptRoot"
 
 try {

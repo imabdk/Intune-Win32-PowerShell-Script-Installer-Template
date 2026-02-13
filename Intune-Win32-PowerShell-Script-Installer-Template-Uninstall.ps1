@@ -1,37 +1,14 @@
-#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Intune Win32 app PowerShell script installer template - Uninstall.
-
 .DESCRIPTION
-    Template for uninstalling applications via the Intune Win32 PowerShell script installer feature.
-    
-    Features:
-    - Supports both MSI and EXE uninstallers
-    - Removes configuration files from user profiles (supports SYSTEM context)
-    - Works with both AD and Entra ID joined devices
-    - Comprehensive logging for troubleshooting
-    
-    Note: This script is designed to run in SYSTEM context via Intune.
-    
+    Uninstalls applications via Intune Win32 PowerShell script installer.
+    Supports MSI/EXE, file removal, and registry cleanup.
+    SYSTEM context: removes HKCU/user files from ALL profiles.
+    User context: removes from current user only.
 .NOTES
-    Author:      Martin Bengtsson
-    Twitter:     @mwbengtsson
-    LinkedIn:    linkedin.com/in/martin-bengtsson
-    Website:     https://www.imab.dk
-    Created:     2026-02-12
-    Updated:     2026-02-12
-    Version:     1.1
-    
-    Changelog:
-    1.1 - Added registry removal support with SYSTEM context awareness
-    1.0 - Initial release
-
-.LINK
-    https://github.com/imabdk/Intune-Win32-PowerShell-Script-Installer-Template
-
-.LINK
-    https://learn.microsoft.com/intune/intune-service/apps/apps-win32-app-management
+    Author:  Martin Bengtsson | imab.dk
+    Version: 1.2
 #>
 
 # === Configuration ===
@@ -56,32 +33,37 @@ $FilesToDelete = @(
 )
 
 # --- Step 3: Remove Registry Settings ---
-# Action: "DeleteValue" removes a single value, "DeleteKey" removes entire key and subkeys
-# SYSTEM context: HKCU paths are automatically applied to all user profiles
+# Action: "DeleteValue" or "DeleteKey" (removes entire key)
+# SYSTEM context: HKCU paths are applied to all user profiles
 $RegistryRemovals = @(
-    # Delete entire keys (removes all values within)
-    @{
-        Path   = "HKLM:\SOFTWARE\imab.dk"
-        Action = "DeleteKey"
-    }
-    @{
-        Path   = "HKCU:\SOFTWARE\imab.dk"
-        Action = "DeleteKey"
-    }
-    # Example: Delete individual values instead of the whole key
-    # @{
-    #     Path   = "HKCU:\SOFTWARE\imab.dk"
-    #     Name   = "AwesomeLevel"
-    #     Action = "DeleteValue"
-    # }
+    @{ Path = "HKLM:\SOFTWARE\imab.dk"; Action = "DeleteKey" }
+    @{ Path = "HKCU:\SOFTWARE\imab.dk"; Action = "DeleteKey" }
 )
 
+# === Runtime Detection ===
+$script:IsSystem = ([System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value -eq "S-1-5-18")
+$script:IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
 #region Functions
+# Tests if path requires administrator privileges
+function Test-RequiresAdmin {
+    param([string]$Path)
+    if ($Path -match "^HKLM:|^Registry::HKEY_LOCAL_MACHINE") { return $true }
+    $adminPaths = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:SystemRoot, $env:ProgramData)
+    foreach ($adminPath in $adminPaths) {
+        if ($adminPath -and $Path -like "$adminPath*") { return $true }
+    }
+    return $false
+}
+
+# Gets all user profiles (AD and Entra ID)
+function Get-UserProfiles {
+    Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*" |
+        Where-Object { $_.PSChildName -match "^S-1-(5-21|12-1)-" -and (Test-Path $_.ProfileImagePath) }
+}
+
+# Writes to console and log file
 function Write-Log {
-    <#
-    .SYNOPSIS
-        Writes to both console (for Intune portal) and local log file.
-    #>
     param(
         [string]$Message,
         [int]$MaxLogSizeMB = 5
@@ -99,11 +81,8 @@ function Write-Log {
     catch { }
 }
 
+# Uninstalls application using MSI or EXE
 function Uninstall-Application {
-    <#
-    .SYNOPSIS
-        Uninstalls the application using MSI or EXE uninstaller.
-    #>
     param (
         [Parameter(Mandatory)]
         [string]$UninstallerPath,
@@ -139,27 +118,15 @@ function Uninstall-Application {
     }
 }
 
+# Deletes files (SYSTEM: from all profiles, User: current only)
 function Remove-FilesFromDestination {
-    <#
-    .SYNOPSIS
-        Deletes files from their destinations.
-        When running as SYSTEM, deletes from all existing user profiles.
-    #>
     param (
         [array]$Files
     )
 
-    # Detect if running as SYSTEM (S-1-5-18)
-    $isSystem = ([System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value -eq "S-1-5-18")
-
     foreach ($file in $Files) {
-        if ($isSystem) {
-            # Get all real user profiles from registry (excludes system accounts)
-            # Supports both traditional AD (S-1-5-21-*) and Entra ID (S-1-12-1-*) joined devices
-            $userProfiles = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*" |
-                Where-Object { $_.PSChildName -match "^S-1-(5-21|12-1)-" -and (Test-Path $_.ProfileImagePath) } |
-                Select-Object -ExpandProperty ProfileImagePath
-
+        if ($script:IsSystem) {
+            $userProfiles = Get-UserProfiles | Select-Object -ExpandProperty ProfileImagePath
             Write-Log "Running as SYSTEM - deleting from $($userProfiles.Count) user profile(s)"
 
             foreach ($profilePath in $userProfiles) {
@@ -167,6 +134,11 @@ function Remove-FilesFromDestination {
                 $filePath = $file `
                     -replace '\$env:APPDATA', "$profilePath\AppData\Roaming" `
                     -replace '\$env:LOCALAPPDATA', "$profilePath\AppData\Local"
+
+                # Check admin requirement for path
+                if ((Test-RequiresAdmin -Path $filePath) -and -not $script:IsAdmin) {
+                    throw "Access denied: '$filePath' requires administrator privileges"
+                }
 
                 if (Test-Path -Path $filePath) {
                     Remove-Item -Path $filePath -Force
@@ -176,6 +148,11 @@ function Remove-FilesFromDestination {
         }
         else {
             # Running as user - delete from current user only
+            # Check admin requirement for path
+            if ((Test-RequiresAdmin -Path $file) -and -not $script:IsAdmin) {
+                throw "Access denied: '$file' requires administrator privileges"
+            }
+
             if (Test-Path -Path $file) {
                 Remove-Item -Path $file -Force
                 Write-Log "Deleted: $file"
@@ -184,34 +161,30 @@ function Remove-FilesFromDestination {
     }
 }
 
+# Removes registry values/keys (SYSTEM: from all profiles, User: current only)
 function Remove-RegistrySettings {
-    <#
-    .SYNOPSIS
-        Removes registry values or keys. HKCU paths are applied to all user profiles when running as SYSTEM.
-    #>
     param (
         [Parameter(Mandatory)]
         [array]$Settings
     )
 
-    $isSystem = ([System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value -eq "S-1-5-18")
-
     foreach ($setting in $Settings) {
         $paths = @()
 
-        if ($setting.Path -like "HKCU:\*" -and $isSystem) {
-            # Get all real user profiles and build paths for each
-            $userProfiles = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*" |
-                Where-Object { $_.PSChildName -match "^S-1-(5-21|12-1)-" -and (Test-Path $_.ProfileImagePath) }
-
+        if ($setting.Path -like "HKCU:\*" -and $script:IsSystem) {
+            $userProfiles = Get-UserProfiles
             Write-Log "Running as SYSTEM - removing from $($userProfiles.Count) user profile(s)"
 
-            foreach ($profile in $userProfiles) {
-                $sid = $profile.PSChildName
+            foreach ($userProfile in $userProfiles) {
+                $sid = $userProfile.PSChildName
                 $paths += $setting.Path -replace "^HKCU:\\", "Registry::HKEY_USERS\$sid\"
             }
         }
         else {
+            # Check admin requirement for HKLM
+            if ((Test-RequiresAdmin -Path $setting.Path) -and -not $script:IsAdmin) {
+                throw "Access denied: '$($setting.Path)' requires administrator privileges"
+            }
             $paths += $setting.Path
         }
 
@@ -238,6 +211,7 @@ function Remove-RegistrySettings {
 #region Main
 Write-Log "=== Starting uninstallation of $AppName ==="
 Write-Log "Running as: $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)"
+Write-Log "Context: $(if ($script:IsSystem) { 'SYSTEM' } else { 'User' }), Admin: $($script:IsAdmin)"
 Write-Log "Script path: $PSScriptRoot"
 
 try {
