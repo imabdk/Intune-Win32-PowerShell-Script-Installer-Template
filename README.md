@@ -29,14 +29,14 @@ Per Microsoft documentation:
 Edit the variables at the top of each script:
 
 ```powershell
-$AppName = "YourAppName"
+$AppName = "Notepad++"
 $LogFile = "$env:ProgramData\Microsoft\IntuneManagementExtension\Logs\$AppName-Install.log"
 ```
 
 ### Installer Settings (Install script only)
 
 ```powershell
-$InstallerFile = "Setup.msi"
+$InstallerFile = "npp.8.9.1.Installer.x64.msi"
 $InstallerArgs = "/qn /norestart"
 ```
 
@@ -44,7 +44,7 @@ $InstallerArgs = "/qn /norestart"
 
 ```powershell
 $FilesToCopy = @(
-    @{ Source = "config.xml"; Destination = "$env:ProgramFiles\YourApp" }
+    @{ Source = "imabdk-config.json"; Destination = "$env:APPDATA\Notepad++" }
 )
 ```
 
@@ -52,8 +52,8 @@ $FilesToCopy = @(
 
 ```powershell
 $RegistryAdditions = @(
-    @{ Path = "HKLM:\SOFTWARE\YourApp"; Name = "AppVersion"; Value = "1.0"; Type = "String" }
-    @{ Path = "HKCU:\SOFTWARE\YourApp"; Name = "UserSetting"; Value = 1; Type = "DWord" }
+    @{ Path = "HKLM:\SOFTWARE\imab.dk"; Name = "AppVersion"; Value = "1.0"; Type = "String" }
+    @{ Path = "HKCU:\SOFTWARE\imab.dk"; Name = "UserSetting"; Value = 1; Type = "DWord" }
 )
 ```
 
@@ -86,7 +86,8 @@ Scripts check for required permissions before attempting operations:
 
 Logs are written to:
 ```
-%ProgramData%\Microsoft\IntuneManagementExtension\Logs\<AppName>.log
+%ProgramData%\Microsoft\IntuneManagementExtension\Logs\<AppName>-Install.log
+%ProgramData%\Microsoft\IntuneManagementExtension\Logs\<AppName>-Uninstall.log
 ```
 
 Each entry includes timestamp and log level (INFO, WARNING, ERROR).
@@ -98,7 +99,7 @@ Example detection rule for registry-based detection:
 | Setting | Value |
 |---------|-------|
 | Rule type | Registry |
-| Key path | `HKEY_LOCAL_MACHINE\SOFTWARE\YourApp` |
+| Key path | `HKEY_LOCAL_MACHINE\SOFTWARE\imab.dk` |
 | Value name | `AppVersion` |
 | Detection method | String comparison |
 | Value | `1.0` |
