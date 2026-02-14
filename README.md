@@ -63,7 +63,7 @@ $UninstallerArgs = "/qn /norestart"
 # EXE example: $UninstallerFile = "$env:ProgramFiles\Notepad++\uninstall.exe"
 
 # File removal
-$FilesToDelete = @(
+$FilesToRemove = @(
     "$env:APPDATA\Notepad++\imabdk-config.json"
     "$env:ProgramFiles\Notepad++\license.lic"
 )

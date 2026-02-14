@@ -25,10 +25,10 @@
 #   MSI: "/qn /norestart"
 #   EXE: "/S" or "/silent" or "/VERYSILENT /SUPPRESSMSGBOXES"
 
-# --- Step 2: Delete Files ---
-# Full path(s) to files to delete
+# --- Step 2: Remove Files ---
+# Full path(s) to files to remove
 # SYSTEM context: $env:APPDATA/$env:LOCALAPPDATA paths are applied to all user profiles
-$FilesToDelete = @(
+$FilesToRemove = @(
     "$env:APPDATA\Notepad++\imabdk-config.json"
     # "$env:LOCALAPPDATA\MyApp\settings.xml"
 )
@@ -119,7 +119,7 @@ function Uninstall-Application {
     }
 }
 
-# Deletes files (SYSTEM: from all profiles, User: current only)
+# Removes files (SYSTEM: from all profiles, User: current only)
 function Remove-FilesFromDestination {
     param (
         [array]$Files
@@ -127,7 +127,7 @@ function Remove-FilesFromDestination {
 
     if ($script:IsSystem) {
         $userProfilePaths = Get-UserProfiles | Select-Object -ExpandProperty ProfileImagePath
-        Write-Log "Running as SYSTEM - deleting from $($userProfilePaths.Count) user profile(s)"
+        Write-Log "Running as SYSTEM - removing from $($userProfilePaths.Count) user profile(s)"
     }
 
     foreach ($file in $Files) {
@@ -145,7 +145,7 @@ function Remove-FilesFromDestination {
 
                 if (Test-Path -Path $filePath) {
                     Remove-Item -Path $filePath -Force
-                    Write-Log "Deleted: $filePath"
+                    Write-Log "Removed: $filePath"
                 }
             }
         }
@@ -156,7 +156,7 @@ function Remove-FilesFromDestination {
 
             if (Test-Path -Path $file) {
                 Remove-Item -Path $file -Force
-                Write-Log "Deleted: $file"
+                Write-Log "Removed: $file"
             }
         }
     }
@@ -222,10 +222,10 @@ try {
     $uninstallerPath = if ([System.IO.Path]::IsPathRooted($UninstallerFile)) { $UninstallerFile } else { Join-Path -Path $PSScriptRoot -ChildPath $UninstallerFile }
     Uninstall-Application -UninstallerPath $uninstallerPath -Arguments $UninstallerArgs -SuccessCodes $SuccessExitCodes
 
-    # --- Step 2: Delete configuration files ---
-    if ($FilesToDelete.Count -gt 0) {
-        Write-Log "--- Step 2: Deleting configuration files ---"
-        Remove-FilesFromDestination -Files $FilesToDelete
+    # --- Step 2: Remove configuration files ---
+    if ($FilesToRemove.Count -gt 0) {
+        Write-Log "--- Step 2: Removing configuration files ---"
+        Remove-FilesFromDestination -Files $FilesToRemove
     }
 
     # --- Step 3: Remove registry settings ---
