@@ -26,56 +26,52 @@ Per Microsoft documentation:
 
 ## Configuration
 
-Edit the variables at the top of each script:
+Edit the variables at the top of each script.
+
+### Install Script
 
 ```powershell
+# App identity
 $AppName = "Notepad++"
-$LogFile = "$env:ProgramData\Microsoft\IntuneManagementExtension\Logs\$AppName-Install.log"
-```
 
-### Installer Settings (Install script)
-
-**MSI example:**
-```powershell
+# Installer (MSI or EXE)
 $InstallerFile = "npp.8.9.1.Installer.x64.msi"
 $InstallerArgs = "/qn /norestart"
-```
 
-**EXE example:**
-```powershell
-$InstallerFile = "npp.8.9.1.Installer.x64.exe"
-$InstallerArgs = "/S"
-```
-
-### Uninstaller Settings (Uninstall script)
-
-**MSI example:**
-```powershell
-$UninstallerFile = "npp.8.9.1.Installer.x64.msi"
-$UninstallerArgs = "/qn /norestart"
-```
-
-**EXE example (absolute path):**
-```powershell
-$UninstallerFile = "$env:ProgramFiles\Notepad++\uninstall.exe"
-$UninstallerArgs = "/S"
-```
-
-### File Copy Settings
-
-```powershell
+# File copy
 $FilesToCopy = @(
     @{ Source = "imabdk-config.json"; Destination = "$env:APPDATA\Notepad++" }
     @{ Source = "license.lic"; Destination = "$env:ProgramFiles\Notepad++" }
 )
-```
 
-### Registry Settings
-
-```powershell
+# Registry additions
 $RegistryAdditions = @(
     @{ Path = "HKLM:\SOFTWARE\imab.dk"; Name = "AppVersion"; Value = "1.0"; Type = "String" }
     @{ Path = "HKCU:\SOFTWARE\imab.dk"; Name = "UserSetting"; Value = 1; Type = "DWord" }
+)
+```
+
+### Uninstall Script
+
+```powershell
+# App identity
+$AppName = "Notepad++"
+
+# Uninstaller (MSI or EXE)
+$UninstallerFile = "npp.8.9.1.Installer.x64.msi"
+$UninstallerArgs = "/qn /norestart"
+# EXE example: $UninstallerFile = "$env:ProgramFiles\Notepad++\uninstall.exe"
+
+# File removal
+$FilesToDelete = @(
+    "$env:APPDATA\Notepad++\imabdk-config.json"
+    "$env:ProgramFiles\Notepad++\license.lic"
+)
+
+# Registry removal
+$RegistryRemovals = @(
+    @{ Path = "HKLM:\SOFTWARE\imab.dk"; Action = "DeleteKey" }
+    @{ Path = "HKCU:\SOFTWARE\imab.dk"; Action = "DeleteKey" }
 )
 ```
 
