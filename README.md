@@ -1,34 +1,25 @@
 # Intune Win32 PowerShell Script Installer Template
 
-Templates for the [PowerShell script installer](https://learn.microsoft.com/en-us/intune/intune-service/apps/apps-win32-app-management#powershell-script-installer) feature in Microsoft Intune Win32 app management. Instead of specifying a command line, you can upload a PowerShell script as the installer. Supports MSI/EXE installation, file copy, and registry settings.
+Ready-to-use templates for the [PowerShell script installer](https://learn.microsoft.com/en-us/intune/intune-service/apps/apps-win32-app-management#powershell-script-installer) in Microsoft Intune. Instead of specifying a traditional command line for your Win32 app, you upload a PowerShell script as the installer and uninstaller. These templates handle MSI/EXE installation, file copy, and registry settings out of the box.
 
-## Files
+Read the full blog post here: [Template for the Win32 PowerShell script installer in Microsoft Intune](https://www.imab.dk/template-for-the-win32-powershell-script-installer-in-microsoft-intune/)
 
-| File | Purpose |
-|------|---------|
-| `Intune-Win32-PowerShell-Script-Installer-Template-Install.ps1` | Installation script |
-| `Intune-Win32-PowerShell-Script-Installer-Template-Uninstall.ps1` | Uninstallation script |
+## Getting started
 
-## Script Requirements
+1. Edit the configuration section at the top of each script (see examples below)
+2. Package your application and any files you need copied with the [Microsoft Win32 Content Prep Tool](https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool)
+3. In Intune, create a new Win32 app and upload the `.intunewin` package
+4. Under **Program**, select **PowerShell script** as the installer type and upload the install and uninstall scripts
 
-Per Microsoft documentation:
-- Scripts are limited to **50 KB** in size
-- Scripts run in the same context as the app installer (SYSTEM or user)
-- Return codes determine installation success or failure
-- Scripts must run silently without user interaction
+The scripts themselves are **not** part of the `.intunewin` package. They are uploaded separately in Intune when you select the PowerShell script installer option.
 
-## Quick Start
-
-1. Copy the template scripts to your package folder
-2. Edit the configuration section at the top of each script
-3. Package with the [Microsoft Win32 Content Prep Tool](https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool)
-4. Upload to Intune as a Win32 app
+**Good to know:** Scripts are limited to 50 KB, must run silently, and run in the same context as the app installer (SYSTEM or user).
 
 ## Configuration
 
-Edit the variables at the top of each script.
+All configuration lives at the top of each script. Here's what you typically change:
 
-### Install Script
+### Install script
 
 ```powershell
 # App identity
@@ -51,7 +42,7 @@ $RegistryAdditions = @(
 )
 ```
 
-### Uninstall Script
+### Uninstall script
 
 ```powershell
 # App identity
@@ -75,33 +66,23 @@ $RegistryRemovals = @(
 )
 ```
 
-## Execution Context
+## How SYSTEM vs user context works
 
-The scripts detect whether they run as **SYSTEM** or as the **current user** and behave differently.
+The scripts detect whether they run as **SYSTEM** or as the **current user** and adjust automatically.
 
-### SYSTEM Context (typical for Intune deployments)
+When running as **SYSTEM** (typical for Intune deployments):
+- HKCU registry settings are applied to all existing user profiles via the HKU hive
+- File copy destinations under user profiles (like `$env:APPDATA`) target all users
+- Both AD (S-1-5-21-\*) and Entra ID (S-1-12-1-\*) accounts are picked up
 
-- HKCU registry settings are applied to **all existing user profiles**
-- File copy destinations under user profiles target **all users**
-- Uses HKU registry hive with user SIDs
-- Supports both AD (S-1-5-21-*) and Entra ID (S-1-12-1-*) accounts
-
-### User Context
-
-- HKCU registry settings apply to **current user only**
-- File operations target **current user profile only**
-- Permission checks prevent failures on protected paths
-
-## Permission Handling
-
-Scripts check for required permissions before attempting operations:
-
-- HKLM registry paths require admin privileges
-- Protected filesystem paths (Program Files, Windows, etc.) require elevation
+When running as the **current user**:
+- HKCU registry settings apply to the current user only
+- File operations target the current user profile only
+- The scripts check permissions before attempting operations on protected paths
 
 ## Logging
 
-Logs are written to:
+Log files are written to the Intune log folder:
 ```
 %ProgramData%\Microsoft\IntuneManagementExtension\Logs\<AppName>-Install.log
 %ProgramData%\Microsoft\IntuneManagementExtension\Logs\<AppName>-Uninstall.log
@@ -117,5 +98,5 @@ Logs are written to:
 
 ## Notes
 
-- Scripts work without admin rights but some operations require elevation
-- Test in a non-production environment before deployment
+- The scripts work without admin rights, but operations on protected paths (Program Files, HKLM, etc.) require elevation
+- Always test in a non-production environment first
