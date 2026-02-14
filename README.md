@@ -107,6 +107,14 @@ Logs are written to:
 %ProgramData%\Microsoft\IntuneManagementExtension\Logs\<AppName>-Uninstall.log
 ```
 
+## Version history
+
+| Version | Changes |
+|---------|---------|
+| 1.3 | Added `$env:USERPROFILE` path translation, `$env:ProgramW6432` for admin detection, fixed non-user paths looping per profile |
+| 1.2 | Added admin privilege detection, file copy/removal support, registry operations for all user profiles |
+| 1.0 | Initial release |
+
 ## Notes
 
 - Scripts work without admin rights but some operations require elevation
