@@ -33,11 +33,32 @@ $AppName = "Notepad++"
 $LogFile = "$env:ProgramData\Microsoft\IntuneManagementExtension\Logs\$AppName-Install.log"
 ```
 
-### Installer Settings (Install script only)
+### Installer Settings (Install script)
 
+**MSI example:**
 ```powershell
 $InstallerFile = "npp.8.9.1.Installer.x64.msi"
 $InstallerArgs = "/qn /norestart"
+```
+
+**EXE example:**
+```powershell
+$InstallerFile = "npp.8.9.1.Installer.x64.exe"
+$InstallerArgs = "/S"
+```
+
+### Uninstaller Settings (Uninstall script)
+
+**MSI example:**
+```powershell
+$UninstallerFile = "npp.8.9.1.Installer.x64.msi"
+$UninstallerArgs = "/qn /norestart"
+```
+
+**EXE example (absolute path):**
+```powershell
+$UninstallerFile = "$env:ProgramFiles\Notepad++\uninstall.exe"
+$UninstallerArgs = "/S"
 ```
 
 ### File Copy Settings

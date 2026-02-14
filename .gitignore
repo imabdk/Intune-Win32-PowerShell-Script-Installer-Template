@@ -7,6 +7,9 @@
 # Test files
 Test-TemplateScripts.ps1
 
+# Blog drafts
+BLOG-DRAFT.md
+
 # Configuration files (examples only)
 *.json
 
