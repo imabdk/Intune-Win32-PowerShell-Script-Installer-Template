@@ -63,16 +63,9 @@ $UninstallerArgs = "/S"
 
 ### File Copy Settings
 
-**User profile directory:**
 ```powershell
 $FilesToCopy = @(
     @{ Source = "imabdk-config.json"; Destination = "$env:APPDATA\Notepad++" }
-)
-```
-
-**Machine directory (requires admin):**
-```powershell
-$FilesToCopy = @(
     @{ Source = "license.lic"; Destination = "$env:ProgramFiles\Notepad++" }
 )
 ```
