@@ -8,7 +8,12 @@
     User context: removes from current user only.
 .NOTES
     Author:  Martin Bengtsson | imab.dk
-    Version: 1.2
+    Version: 1.3
+    History:
+        1.3 - Added $env:USERPROFILE translation, $env:ProgramW6432 admin check,
+              fixed non-user paths looping through all profiles when running as SYSTEM
+        1.2 - Added admin detection, file removal and registry cleanup support
+        1.0 - Initial release
 #>
 
 # === Configuration ===
@@ -27,7 +32,7 @@
 
 # --- Step 2: Remove Files ---
 # Full path(s) to files to remove
-# SYSTEM context: $env:APPDATA/$env:LOCALAPPDATA paths are applied to all user profiles
+# SYSTEM context: $env:APPDATA/$env:LOCALAPPDATA/$env:USERPROFILE paths are applied to all user profiles
 $FilesToRemove = @(
     "$env:APPDATA\Notepad++\imabdk-config.json"
     # "$env:LOCALAPPDATA\MyApp\settings.xml"
@@ -50,7 +55,7 @@ $script:IsAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.Wind
 function Test-RequiresAdmin {
     param([string]$Path)
     if ($Path -match "^HKLM:|^Registry::HKEY_LOCAL_MACHINE") { return $true }
-    $adminPaths = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:SystemRoot, $env:ProgramData)
+    $adminPaths = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramW6432, $env:SystemRoot, $env:ProgramData)
     foreach ($adminPath in $adminPaths) {
         if ($adminPath -and $Path -like "$adminPath*") { return $true }
     }
@@ -127,21 +132,18 @@ function Remove-FilesFromDestination {
 
     if ($script:IsSystem) {
         $userProfilePaths = Get-UserProfiles | Select-Object -ExpandProperty ProfileImagePath
-        Write-Log "Running as SYSTEM - removing from $($userProfilePaths.Count) user profile(s)"
     }
 
     foreach ($file in $Files) {
-        if ($script:IsSystem) {
+        $isUserPath = $file -match '\$env:(APPDATA|LOCALAPPDATA|USERPROFILE)'
+        if ($script:IsSystem -and $isUserPath) {
+            Write-Log "Removing from $($userProfilePaths.Count) user profile(s)"
             foreach ($profilePath in $userProfilePaths) {
                 # Translate user-specific environment paths to actual profile paths
                 $filePath = $file `
                     -replace '\$env:APPDATA', "$profilePath\AppData\Roaming" `
-                    -replace '\$env:LOCALAPPDATA', "$profilePath\AppData\Local"
-
-                # Check admin requirement for path
-                if ((Test-RequiresAdmin -Path $filePath) -and -not $script:IsAdmin) {
-                    throw "Access denied: '$filePath' requires administrator privileges"
-                }
+                    -replace '\$env:LOCALAPPDATA', "$profilePath\AppData\Local" `
+                    -replace '\$env:USERPROFILE', "$profilePath"
 
                 if (Test-Path -Path $filePath) {
                     Remove-Item -Path $filePath -Force

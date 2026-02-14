@@ -7,6 +7,10 @@
 # Test files
 Test-TemplateScripts.ps1
 
+# Example scripts (not part of template)
+Notepad++-EXE-Install.ps1
+Notepad++-EXE-Uninstall.ps1
+
 # Blog drafts
 BLOG-DRAFT.md
 
