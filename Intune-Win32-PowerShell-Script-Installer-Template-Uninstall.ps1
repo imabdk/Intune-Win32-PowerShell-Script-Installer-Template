@@ -32,10 +32,11 @@
 
 # --- Step 2: Remove Files ---
 # Full path(s) to files to remove
+# Use single quotes for $env: paths to preserve variable names for per-user expansion
 # SYSTEM context: $env:APPDATA/$env:LOCALAPPDATA/$env:USERPROFILE paths are applied to all user profiles
 $FilesToRemove = @(
-    "$env:APPDATA\Notepad++\imabdk-config.json"
-    # "$env:LOCALAPPDATA\MyApp\settings.xml"
+    '$env:APPDATA\Notepad++\imabdk-config.json'
+    # '$env:LOCALAPPDATA\MyApp\settings.xml'
 )
 
 # --- Step 3: Remove Registry Settings ---
@@ -44,6 +45,8 @@ $FilesToRemove = @(
 $RegistryRemovals = @(
     @{ Path = "HKLM:\SOFTWARE\imab.dk"; Action = "DeleteKey" }
     @{ Path = "HKCU:\SOFTWARE\imab.dk"; Action = "DeleteKey" }
+    # Remove a single value instead of the entire key:
+    # @{ Path = "HKCU:\SOFTWARE\imab.dk"; Name = "UserSetting"; Action = "DeleteValue" }
 )
 
 # === Runtime Detection ===
@@ -152,13 +155,14 @@ function Remove-FilesFromDestination {
             }
         }
         else {
-            if ((Test-RequiresAdmin -Path $file) -and -not $script:IsAdmin) {
-                throw "Access denied: '$file' requires administrator privileges"
+            $filePath = $ExecutionContext.InvokeCommand.ExpandString($file)
+            if ((Test-RequiresAdmin -Path $filePath) -and -not $script:IsAdmin) {
+                throw "Access denied: '$filePath' requires administrator privileges"
             }
 
-            if (Test-Path -Path $file) {
-                Remove-Item -Path $file -Force
-                Write-Log "Removed: $file"
+            if (Test-Path -Path $filePath) {
+                Remove-Item -Path $filePath -Force
+                Write-Log "Removed: $filePath"
             }
         }
     }

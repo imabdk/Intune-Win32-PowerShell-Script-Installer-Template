@@ -32,9 +32,10 @@
 
 # --- Step 2: Copy Files ---
 # Source = filename in package, Destination = target folder
+# Use single quotes for $env: paths to preserve variable names for per-user expansion
 # SYSTEM context: $env:APPDATA/$env:LOCALAPPDATA/$env:USERPROFILE paths are applied to all user profiles
 $FilesToCopy = @(
-    @{ Source = "imabdk-config.json"; Destination = "$env:APPDATA\Notepad++" }
+    @{ Source = "imabdk-config.json"; Destination = '$env:APPDATA\Notepad++' }
     # @{ Source = "another-file.xml"; Destination = "C:\ProgramData\MyApp" }
 )
 
@@ -160,15 +161,16 @@ function Copy-FilesToDestination {
             }
         }
         else {
-            if ((Test-RequiresAdmin -Path $file.Destination) -and -not $script:IsAdmin) {
-                throw "Access denied: '$($file.Destination)' requires administrator privileges"
+            $destPath = $ExecutionContext.InvokeCommand.ExpandString($file.Destination)
+            if ((Test-RequiresAdmin -Path $destPath) -and -not $script:IsAdmin) {
+                throw "Access denied: '$destPath' requires administrator privileges"
             }
 
-            if (-not (Test-Path -Path $file.Destination)) {
-                New-Item -Path $file.Destination -ItemType Directory -Force | Out-Null
+            if (-not (Test-Path -Path $destPath)) {
+                New-Item -Path $destPath -ItemType Directory -Force | Out-Null
             }
-            Copy-Item -Path $sourcePath -Destination $file.Destination -Force
-            Write-Log "Copied: $($file.Source) -> $($file.Destination)"
+            Copy-Item -Path $sourcePath -Destination $destPath -Force
+            Write-Log "Copied: $($file.Source) -> $destPath"
         }
     }
 }

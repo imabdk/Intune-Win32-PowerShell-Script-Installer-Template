@@ -29,10 +29,10 @@ $AppName = "Notepad++"
 $InstallerFile = "npp.8.9.1.Installer.x64.msi"
 $InstallerArgs = "/qn /norestart"
 
-# File copy
+# File copy (use single quotes for $env: paths)
 $FilesToCopy = @(
-    @{ Source = "imabdk-config.json"; Destination = "$env:APPDATA\Notepad++" }
-    @{ Source = "license.lic"; Destination = "$env:ProgramFiles\Notepad++" }
+    @{ Source = "imabdk-config.json"; Destination = '$env:APPDATA\Notepad++' }
+    @{ Source = "license.lic"; Destination = '$env:ProgramW6432\Notepad++' }
 )
 
 # Registry additions
@@ -51,18 +51,20 @@ $AppName = "Notepad++"
 # Uninstaller (MSI or EXE)
 $UninstallerFile = "npp.8.9.1.Installer.x64.msi"
 $UninstallerArgs = "/qn /norestart"
-# EXE example: $UninstallerFile = "$env:ProgramFiles\Notepad++\uninstall.exe"
+# EXE example: $UninstallerFile = "$env:ProgramW6432\Notepad++\uninstall.exe"
 
-# File removal
+# File removal (use single quotes for $env: paths)
 $FilesToRemove = @(
-    "$env:APPDATA\Notepad++\imabdk-config.json"
-    "$env:ProgramFiles\Notepad++\license.lic"
+    '$env:APPDATA\Notepad++\imabdk-config.json'
+    '$env:ProgramW6432\Notepad++\license.lic'
 )
 
 # Registry removal
 $RegistryRemovals = @(
     @{ Path = "HKLM:\SOFTWARE\imab.dk"; Action = "DeleteKey" }
     @{ Path = "HKCU:\SOFTWARE\imab.dk"; Action = "DeleteKey" }
+    # Remove a single value instead of the entire key:
+    # @{ Path = "HKCU:\SOFTWARE\imab.dk"; Name = "UserSetting"; Action = "DeleteValue" }
 )
 ```
 
