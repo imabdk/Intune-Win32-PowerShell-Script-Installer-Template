@@ -8,8 +8,10 @@
     User context: applies to current user only.
 .NOTES
     Author:  Martin Bengtsson | imab.dk
-    Version: 1.3
+    Version: 1.4
     History:
+        1.4 - HKU enumeration for registry operations, single-quoted config paths,
+              ExpandString for user-context expansion, strict SID regex
         1.3 - Added $env:USERPROFILE translation, $env:ProgramW6432 admin check,
               fixed non-user paths looping through all profiles when running as SYSTEM
         1.2 - Added admin detection, file copy and registry support
@@ -63,10 +65,16 @@ function Test-RequiresAdmin {
     return $false
 }
 
-# Gets all user profiles (AD and Entra ID)
+# Gets all user profiles (AD and Entra ID) - used for file operations
 function Get-UserProfiles {
     Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*" |
         Where-Object { $_.PSChildName -match "^S-1-(5-21|12-1)-" -and (Test-Path $_.ProfileImagePath) }
+}
+
+# Gets user SIDs with loaded registry hives - used for registry operations
+function Get-UserSIDs {
+    (Get-ChildItem "Registry::HKEY_USERS" -ErrorAction SilentlyContinue).PSChildName |
+        Where-Object { $_ -match '^S-1-(5-21|12-1)-\d+-\d+-\d+-\d+$' }
 }
 
 # Writes to console and log file
@@ -175,24 +183,26 @@ function Copy-FilesToDestination {
     }
 }
 
-# Applies registry settings (SYSTEM: to all profiles, User: current only)
+# Applies registry settings (SYSTEM: to all loaded hives, User: current only)
 function Set-RegistryAdditions {
     param (
         [Parameter(Mandatory)]
         [array]$Settings
     )
 
-    $userProfiles = if ($script:IsSystem) { Get-UserProfiles } else { $null }
-    if ($userProfiles) {
-        Write-Log "Running as SYSTEM - applying HKCU settings to $($userProfiles.Count) user profile(s)"
+    $userSIDs = if ($script:IsSystem) { Get-UserSIDs } else { $null }
+    if ($userSIDs) {
+        Write-Log "Running as SYSTEM - applying HKCU settings to $(@($userSIDs).Count) user(s)"
     }
 
     foreach ($setting in $Settings) {
         if ($setting.Path -like "HKCU:\*" -and $script:IsSystem) {
-            foreach ($userProfile in $userProfiles) {
-                $sid = $userProfile.PSChildName
-                $hivePath = "Registry::HKEY_USERS\$sid"
-                $regPath = $setting.Path -replace "^HKCU:\\", "$hivePath\"
+            if (-not $userSIDs) {
+                Write-Log "No user hives loaded - skipping HKCU settings"
+                continue
+            }
+            foreach ($sid in $userSIDs) {
+                $regPath = $setting.Path -replace "^HKCU:\\", "Registry::HKEY_USERS\$sid\"
 
                 if (-not (Test-Path $regPath)) {
                     New-Item -Path $regPath -Force | Out-Null
