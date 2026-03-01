@@ -100,6 +100,12 @@ Log files are written to the Intune log folder:
 | 1.2 | Added admin privilege detection, file copy/removal support, registry operations for all user profiles |
 | 1.0 | Initial release |
 
+## Known issue: 32-bit process (March 2026)
+
+The "Run script as 32-bit process on 64-bit clients" toggle in the PowerShell script installer doesn't appear to have any effect. Scripts consistently run as a 32-bit process regardless of the setting. This means HKLM registry writes will silently land in `HKLM:\SOFTWARE\WOW6432Node` due to WOW64 redirection.
+
+The scripts log the process architecture so you can verify this in the logs. If you need guaranteed 64-bit execution, consider packaging your script as a regular Win32 app (.intunewin) where you control the install command line and can use `%SystemRoot%\SysNative\WindowsPowerShell\v1.0\powershell.exe` directly.
+
 ## Notes
 
 - The scripts work without admin rights, but operations on protected paths (Program Files, HKLM, etc.) require elevation
