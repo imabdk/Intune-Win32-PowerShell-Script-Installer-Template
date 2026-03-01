@@ -8,8 +8,9 @@
     User context: applies to current user only.
 .NOTES
     Author:  Martin Bengtsson | imab.dk
-    Version: 1.4
+    Version: 1.5
     History:
+        1.5 - Added process architecture and script hash logging
         1.4 - HKU enumeration for registry operations, single-quoted config paths,
               ExpandString for user-context expansion, strict SID regex
         1.3 - Added $env:USERPROFILE translation, $env:ProgramW6432 admin check,
@@ -38,6 +39,7 @@
 # SYSTEM context: $env:APPDATA/$env:LOCALAPPDATA/$env:USERPROFILE paths are applied to all user profiles
 $FilesToCopy = @(
     @{ Source = "imabdk-config.json"; Destination = '$env:APPDATA\Notepad++' }
+    @{ Source = "imabdk-config.json"; Destination = '$env:ProgramW6432\Notepad++' }
     # @{ Source = "another-file.xml"; Destination = "C:\ProgramData\MyApp" }
 )
 
@@ -230,6 +232,8 @@ function Set-RegistryAdditions {
 Write-Log "=== Starting installation of $AppName ==="
 Write-Log "Running as: $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)"
 Write-Log "Context: $(if ($script:IsSystem) { 'SYSTEM' } else { 'User' }), Admin: $($script:IsAdmin)"
+Write-Log "Process: $(if ([Environment]::Is64BitProcess) { '64-bit' } else { '32-bit (WOW64 - registry writes will be redirected!)' }), OS: $(if ([Environment]::Is64BitOperatingSystem) { '64-bit' } else { '32-bit' })"
+Write-Log "Script hash: $((Get-FileHash -Path $PSCommandPath -Algorithm MD5).Hash.Substring(0,8))"
 Write-Log "Script path: $PSScriptRoot"
 
 try {

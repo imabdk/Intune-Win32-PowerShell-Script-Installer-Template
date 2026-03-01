@@ -94,6 +94,7 @@ Log files are written to the Intune log folder:
 
 | Version | Changes |
 |---------|---------|
+| 1.5 | Process architecture and script hash logging |
 | 1.4 | HKU enumeration for registry operations, single-quoted config paths with `ExpandString`, strict SID regex excluding `_Classes` hive entries |
 | 1.3 | Added `$env:USERPROFILE` path translation, `$env:ProgramW6432` for admin detection, fixed non-user paths looping per profile |
 | 1.2 | Added admin privilege detection, file copy/removal support, registry operations for all user profiles |
